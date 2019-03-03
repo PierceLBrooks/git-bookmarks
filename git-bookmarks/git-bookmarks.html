@@ -2,6 +2,8 @@
 <html>
 	<head>
 		<title>git-bookmarks</title>
+		<script src="https://unpkg.com/browserfs"></script>
+		<script src="https://unpkg.com/isomorphic-git"></script>
 		<script src="git-bookmarks.js"></script>
 	</head>
 	&lt;git-bookmarks&gt;
@@ -12,6 +14,15 @@
 		<br>
 		Repo URL:
 		<input id="repoURL" type="text" value="" />
+		<br>
+		Branch:
+		<input id="branch" type="text" value="" />
+		<br>
+		Author Email:
+		<input id="author" type="text" value="" />
+		<br>
+		Commit Message:
+		<input id="commit" type="text" value="" />
 		<br>
 		<button id="configure">Configure</button>
 		<br>

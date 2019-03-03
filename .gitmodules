@@ -1,3 +1,6 @@
 [submodule "submodules/isomorphic-git"]
 	path = submodules/isomorphic-git
 	url = https://github.com/isomorphic-git/isomorphic-git.git
+[submodule "submodules/browserfs"]
+	path = submodules/browserfs
+	url = https://github.com/jvilk/BrowserFS.git
