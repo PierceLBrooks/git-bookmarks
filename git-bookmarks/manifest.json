@@ -28,5 +28,9 @@
 			"dark": "icons/icon-32.png",
 			"size": 32
 		}]
-	}
+	},
+	"permissions":
+	[
+		"bookmarks"
+	]
 }
