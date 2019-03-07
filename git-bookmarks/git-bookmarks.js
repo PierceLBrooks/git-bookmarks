@@ -52,6 +52,11 @@ function getPath(getter)
 	browser.storage.local.get("path").then(getter, error);
 }
 
+function getProxy(getter)
+{
+	browser.storage.local.get("proxy").then(getter, error);
+}
+
 function getRepoURL(getter)
 {
 	browser.storage.local.get("repoURL").then(getter, error);
@@ -74,39 +79,66 @@ function getCommit(getter)
 
 function indent(level)
 {
-	return ".".repeat(level);
+	return "&nbsp;.&nbsp;".repeat(level);
 }
 
-function process(node, level, output)
+async function process(current, level, output, path)
 {
-	if (node.url)
+	var i;
+	var index;
+	var children = [];
+	console.log("Level: "+level);
+	for (i  = 0; i < path.length; ++i)
 	{
-		output(level, node.url);
+		children.push(path[i]);
+	}
+	if (current.url)
+	{
+		var child = [];
+		for (i = 0; i < children.length; ++i)
+		{
+			child.push(children[i]);
+		}
+		index = await output(level, current.url, current.title, child, false);
 	}
 	else
 	{
-		output(level, node.title);
+		index = await output(level, current.title, current.title, children, true);
 		level += 1;
 	}
-	if (node.children)
+	children.push(""+index);
+	if (current.children)
 	{
-		for (child of node.children)
+		var next;
+		for (next of current.children)
 		{
-			process(child, level, output);
+			var child = [];
+			for (i = 0; i < children.length; ++i)
+			{
+				child.push(children[i]);
+			}
+			await process(next, level, output, children);
 		}
 	}
 	level -= 1;
 	return level;
 }
 
-function prepare(level, string)
+function prepare(name, link)
 {
-	return indent(level)+string+"\n";
+	return "<a href=\""+link+"\">"+name+"</a><br>\n";
+}
+
+function report(total, free)
+{
+	console.log("Total: "+total);
+	console.log("Free: "+free);
 }
 
 async function handler(nodes)
 {
-	var path = document.getElementById("path").value;
+	var root = document.getElementById("path").value;
+	var proxy = document.getElementById("proxy").value;
 	var repoURL = document.getElementById("repoURL").value;
 	var branch = document.getElementById("branch").value;
 	var author = document.getElementById("author").value;
@@ -115,43 +147,72 @@ async function handler(nodes)
 	var pass = document.getElementById("pass").value;
 	var content = "";
 	var index = 0;
-	var input = function(level, string)
+	var input = async function(level, link, name, path, directory)
 	{
-		var line = prepare(level, string);
-		console.log(index);
-		console.log(line);
+		var i;
+		var line;
+		var full = "";
 		index += 1;
-		content += line;
+		for (i = 0; i < path.length; ++i)
+		{
+			full += path[i]+"/";
+		}
+		full = root+full;
+		console.log("Index: "+index);
+		if (directory)
+		{
+			console.log("Directory: "+full);
+			await fs.mkdir(full);
+			await new Promise((resolve, reject) => fs.writeFile(
+				full+".gitkeep",
+				"",
+				(problem) => problem ? reject(problem) : resolve()
+			));
+			//await fs.readdir(full);
+		}
+		else
+		{
+			full += index;
+			full += ".html";
+			line = prepare(name, link);
+			content += indent(level)+line;
+			console.log("File: "+full);
+			console.log(line);
+			await new Promise((resolve, reject) => fs.writeFile(
+				full,
+				line,
+				(problem) => problem ? reject(problem) : resolve()
+			));
+		}
+		return index;
 	};
 	console.log("Here we go, I guess?");
-	if (process(nodes[0], 0, input) > 0)
-	{
-		return "Node processing failure...";
-	}
+	//await fs.diskSpace(root, report);
+	await process(nodes[0], 0, input, []);
 	console.log(index);
 	//console.log(content);
 	console.log("Nodes have been processed...");
 	console.log("Clone...");
 	await git.clone(
 	{
-		"dir": path,
+		"dir": root,
 		"url": repoURL,
 		"ref": branch,
 		"singleBranch": true,
 		"depth": 1,
-		"corsProxy": "https://cors.isomorphic-git.org",
+		"corsProxy": proxy,
 	});
 	console.log("Write...");
 	await new Promise((resolve, reject) => fs.writeFile(
-		path+"test.txt",
+		root+"index.html",
 		content,
 		(problem) => problem ? reject(problem) : resolve()
 	));
 	console.log("Add...");
-	await git.add({"dir": path, "filepath": "."});
+	await git.add({"dir": root, "filepath": "."});
 	console.log("Commit...");
 	let sha = await git.commit({
-		"dir": path,
+		"dir": root,
 		"author":
 		{
 			"name": author,
@@ -163,7 +224,7 @@ async function handler(nodes)
 	console.log("Push...");
 	let result = await git.push(
 	{
-		"dir": path,
+		"dir": root,
 		"url": repoURL,
 		"ref": branch,
 		"username": user,
@@ -186,6 +247,7 @@ async function handler(nodes)
 			}
 		}
 	}
+	await fs.rmdir(root);
 	return "Done!";
 }
 
@@ -197,12 +259,14 @@ function handle(nodes)
 function configure(target)
 {
 	var path = target.getElementById("path").value;
+	var proxy = target.getElementById("proxy").value;
 	var repoURL = target.getElementById("repoURL").value;
 	var branch = target.getElementById("branch").value;
 	var author = target.getElementById("author").value;
 	var commit = target.getElementById("commit").value;
 	var configuration = {};
 	configuration["path"] = path;
+	configuration["proxy"] = path;
 	configuration["repoURL"] = repoURL;
 	configuration["branch"] = branch;
 	configuration["author"] = author;
@@ -219,6 +283,7 @@ function push()
 document.addEventListener("DOMContentLoaded", function()
 {
 	get(getPath, "path");
+	get(getProxy, "proxy");
 	get(getRepoURL, "repoURL");
 	get(getBranch, "branch");
 	get(getAuthor, "author");
