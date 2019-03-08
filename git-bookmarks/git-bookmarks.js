@@ -1,5 +1,6 @@
+/*
 //const git = require("isomorphic-git");
-BrowserFS.configure({"fs": "IndexedDB", "options": {}}, function(problem)
+BrowserFS.configure({"fs": "IndexedDB", "options": {}}, async function(problem)
 {
 	if (problem)
 	{
@@ -9,11 +10,22 @@ BrowserFS.configure({"fs": "IndexedDB", "options": {}}, function(problem)
 	//window.process = BrowserFS.BFSRequire("process");
 	git.plugins.set("fs", window.fs);
 	//git.plugins.set("process", window.process);
+	files = await git.listFiles(
+	{
+		"dir": "/"
+	});
+	console.log(files);
 });
 process.browser = true;
 //console.log(BrowserFS);
 //console.log(window.fs);
 //console.log(git);
+*/
+
+window.fs = new LightningFS("fs", { "wipe": true });
+git.plugins.set("fs", window.fs);
+window.pfs = pify(window.fs);
+process.browser = true;
 
 function error(message)
 {
@@ -94,12 +106,7 @@ async function process(current, level, output, path)
 	}
 	if (current.url)
 	{
-		var child = [];
-		for (i = 0; i < children.length; ++i)
-		{
-			child.push(children[i]);
-		}
-		index = await output(level, current.url, current.title, child, false);
+		index = await output(level, current.url, current.title, children, false);
 	}
 	else
 	{
@@ -124,15 +131,28 @@ async function process(current, level, output, path)
 	return level;
 }
 
-function prepare(name, link)
+function prepare(name, target)
 {
-	return "<a href=\""+link+"\">"+name+"</a><br>\n";
+	return "<a href=\""+target+"\">"+name+"</a><br>\n";
 }
 
 function report(total, free)
 {
 	console.log("Total: "+total);
 	console.log("Free: "+free);
+}
+
+async function write(path, content)
+{
+	/*
+	await new Promise((resolve, reject) => fs.writeFile(
+		path,
+		content,
+		(problem) => problem ? reject(problem) : resolve()
+	));
+	*/
+	await pfs.writeFile(path, content, "utf8");
+	return "Done!";
 }
 
 async function handler(nodes)
@@ -147,7 +167,7 @@ async function handler(nodes)
 	var pass = document.getElementById("pass").value;
 	var content = "";
 	var index = 0;
-	var input = async function(level, link, name, path, directory)
+	var input = async function(level, target, name, path, directory)
 	{
 		var i;
 		var line;
@@ -161,37 +181,29 @@ async function handler(nodes)
 		console.log("Index: "+index);
 		if (directory)
 		{
-			console.log("Directory: "+full);
-			await fs.mkdir(full);
-			await new Promise((resolve, reject) => fs.writeFile(
-				full+".gitkeep",
-				"",
-				(problem) => problem ? reject(problem) : resolve()
-			));
-			//await fs.readdir(full);
+			if (index > 1)
+			{
+				console.log("Directory: "+full);
+				await pfs.mkdir(full);
+				write(full+".gitkeep", "");
+				//await fs.readdir(full);
+			}
 		}
 		else
 		{
 			full += index;
 			full += ".html";
-			line = prepare(name, link);
+			line = prepare(name, target);
 			content += indent(level)+line;
 			console.log("File: "+full);
 			console.log(line);
-			await new Promise((resolve, reject) => fs.writeFile(
-				full,
-				line,
-				(problem) => problem ? reject(problem) : resolve()
-			));
+			write(full, line);
 		}
 		return index;
 	};
-	console.log("Here we go, I guess?");
 	//await fs.diskSpace(root, report);
-	await process(nodes[0], 0, input, []);
 	console.log(index);
 	//console.log(content);
-	console.log("Nodes have been processed...");
 	console.log("Clone...");
 	await git.clone(
 	{
@@ -202,12 +214,20 @@ async function handler(nodes)
 		"depth": 1,
 		"corsProxy": proxy,
 	});
+	files = await git.listFiles(
+	{
+		"dir": root
+	});
+	console.log("Here we go, I guess?");
+	await process(nodes[0], 0, input, []);
+	console.log("Nodes have been processed...");
+	files = await git.listFiles(
+	{
+		"dir": root
+	});
+	console.log(files);
 	console.log("Write...");
-	await new Promise((resolve, reject) => fs.writeFile(
-		root+"index.html",
-		content,
-		(problem) => problem ? reject(problem) : resolve()
-	));
+	write(root+"index.html", content);
 	console.log("Add...");
 	await git.add({"dir": root, "filepath": "."});
 	console.log("Commit...");
@@ -247,7 +267,7 @@ async function handler(nodes)
 			}
 		}
 	}
-	await fs.rmdir(root);
+	await pfs.rmdir(root);
 	return "Done!";
 }
 
@@ -266,7 +286,7 @@ function configure(target)
 	var commit = target.getElementById("commit").value;
 	var configuration = {};
 	configuration["path"] = path;
-	configuration["proxy"] = path;
+	configuration["proxy"] = proxy;
 	configuration["repoURL"] = repoURL;
 	configuration["branch"] = branch;
 	configuration["author"] = author;

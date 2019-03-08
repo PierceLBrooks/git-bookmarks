@@ -4,3 +4,6 @@
 [submodule "submodules/browserfs"]
 	path = submodules/browserfs
 	url = https://github.com/jvilk/BrowserFS.git
+[submodule "submodules/lightning-fs"]
+	path = submodules/lightning-fs
+	url = https://github.com/isomorphic-git/lightning-fs.git
