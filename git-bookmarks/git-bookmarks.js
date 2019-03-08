@@ -1,4 +1,4 @@
-/*
+///*
 //const git = require("isomorphic-git");
 BrowserFS.configure({"fs": "IndexedDB", "options": {}}, async function(problem)
 {
@@ -20,12 +20,14 @@ process.browser = true;
 //console.log(BrowserFS);
 //console.log(window.fs);
 //console.log(git);
-*/
+//*/
 
+/*
 window.fs = new LightningFS("fs", { "wipe": true });
 git.plugins.set("fs", window.fs);
 window.pfs = pify(window.fs);
 process.browser = true;
+*/
 
 function error(message)
 {
@@ -91,44 +93,39 @@ function getCommit(getter)
 
 function indent(level)
 {
-	return "&nbsp;.&nbsp;".repeat(level);
+	return "&nbsp;*&nbsp;".repeat(level);
 }
 
-async function process(current, level, output, path)
+async function process(current, level, output)
 {
 	var i;
 	var index;
-	var children = [];
-	console.log("Level: "+level);
-	for (i  = 0; i < path.length; ++i)
+	var content = "";
+	//console.log("Level: "+level);
+	content += ("\t".repeat(level))+"<bookmark\n";
+	content += ("\t".repeat(level))+"\tname=\""+current.title+"\"";
+	if (current.children)
 	{
-		children.push(path[i]);
-	}
-	if (current.url)
-	{
-		index = await output(level, current.url, current.title, children, false);
+		index = await output(level, current.title, current.title, false);
+		level += 1;
 	}
 	else
 	{
-		index = await output(level, current.title, current.title, children, true);
-		level += 1;
+		index = await output(level, current.url, current.title, true);
+		content += "\n"+("\t".repeat(level))+"\turl=\""+current.url+"\"";
 	}
-	children.push(""+index);
+	content += ">\n";
 	if (current.children)
 	{
 		var next;
 		for (next of current.children)
 		{
-			var child = [];
-			for (i = 0; i < children.length; ++i)
-			{
-				child.push(children[i]);
-			}
-			await process(next, level, output, children);
+			content += await process(next, level, output);
 		}
 	}
 	level -= 1;
-	return level;
+	content += ("\t".repeat(level))+"</bookmark>\n";;
+	return content;
 }
 
 function prepare(name, target)
@@ -144,14 +141,14 @@ function report(total, free)
 
 async function write(path, content)
 {
-	/*
+	///*
 	await new Promise((resolve, reject) => fs.writeFile(
 		path,
 		content,
 		(problem) => problem ? reject(problem) : resolve()
 	));
-	*/
-	await pfs.writeFile(path, content, "utf8");
+	//*/
+	//await pfs.writeFile(path, content, "utf8");
 	return "Done!";
 }
 
@@ -165,40 +162,28 @@ async function handler(nodes)
 	var commit = document.getElementById("commit").value;
 	var user = document.getElementById("user").value;
 	var pass = document.getElementById("pass").value;
-	var content = "";
+	var contentHTML = "";
+	var contentXML = "";
 	var index = 0;
-	var input = async function(level, target, name, path, directory)
+	var input = async function(level, target, name, directory)
 	{
 		var i;
 		var line;
 		var full = "";
 		index += 1;
-		for (i = 0; i < path.length; ++i)
-		{
-			full += path[i]+"/";
-		}
-		full = root+full;
-		console.log("Index: "+index);
+		//console.log("Index: "+index);
 		if (directory)
 		{
-			if (index > 1)
-			{
-				console.log("Directory: "+full);
-				await pfs.mkdir(full);
-				write(full+".gitkeep", "");
-				//await fs.readdir(full);
-			}
+			line = name;
 		}
 		else
 		{
-			full += index;
-			full += ".html";
 			line = prepare(name, target);
-			content += indent(level)+line;
-			console.log("File: "+full);
-			console.log(line);
-			write(full, line);
 		}
+		contentHTML += indent(level)+line;
+		//console.log("File: "+full);
+		console.log(line);
+		//write(full, line);
 		return index;
 	};
 	//await fs.diskSpace(root, report);
@@ -219,15 +204,19 @@ async function handler(nodes)
 		"dir": root
 	});
 	console.log("Here we go, I guess?");
-	await process(nodes[0], 0, input, []);
+	contentXML += await process(nodes[0], 0, input, []);
 	console.log("Nodes have been processed...");
+	/*
 	files = await git.listFiles(
 	{
 		"dir": root
 	});
+	*/
 	console.log(files);
 	console.log("Write...");
-	write(root+"index.html", content);
+	write(root+"index.html", contentHTML);
+	contentXML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+contentXML;
+	write(root+"index.xml", contentXML);
 	console.log("Add...");
 	await git.add({"dir": root, "filepath": "."});
 	console.log("Commit...");
@@ -267,7 +256,7 @@ async function handler(nodes)
 			}
 		}
 	}
-	await pfs.rmdir(root);
+	//await pfs.rmdir(root);
 	return "Done!";
 }
 
