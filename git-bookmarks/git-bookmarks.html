@@ -15,34 +15,88 @@
 	&lt;git-bookmarks&gt;
 	<br>
 	<body>
-		Path:
-		<input id="path" type="text" value="" />
-		<br>
-		Proxy:
-		<input id="proxy" type="text" value="" />
-		<br>
-		Repo URL:
-		<input id="repoURL" type="text" value="" />
-		<br>
-		Branch:
-		<input id="branch" type="text" value="" />
-		<br>
-		Author Email:
-		<input id="author" type="text" value="" />
-		<br>
-		Commit Message:
-		<input id="commit" type="text" value="" />
-		<br>
-		<button id="configure">Configure</button>
-		<br>
-		Username:
-		<input id="user" type="text" value="" />
-		<br>
-		Password:
-		<input id="pass" type="password" value="" />
-		<br>
-		<button id="push">Push</button>
-		<br>
+		<table>
+			<tr>
+				<td>
+					Path:
+					<br>
+					<input id="path" type="text" value="">
+				</td>
+			</tr>
+			<tr>
+				<td>
+					Proxy:
+					<br>
+					<input id="proxy" type="text" value="">
+				</td>
+			</tr>
+			<tr>
+				<td>
+					Repo URL:
+					<br>
+					<input id="repoURL" type="text" value="">
+				</td>
+			</tr>
+			<tr>
+				<td>
+					Branch:
+					<br>
+					<input id="branch" type="text" value="" />
+				</td>
+			</tr>
+			<tr>
+				<td>
+					Author Email:
+					<br>
+					<input id="author" type="text" value="">
+				</td>
+			</tr>
+			<tr>
+				<td>
+					Commit Message:
+					<br>
+					<input id="commit" type="text" value="">
+				</td>
+			</tr>
+		</table>
+		<table>
+			<tr>
+				<td>
+					Whitespaced Formatting:
+				</td>
+				<td>
+					<input id="format" type="checkbox">
+				</td>
+			</tr>
+		</table>
+		<table>
+			<tr>
+				<td>
+					<button id="configure">Configure</button>
+				</td>
+			</tr>
+		</table>
+		<table>
+			<tr>
+				<td>
+					Username:
+					<br>
+					<input id="user" type="text" value="">
+				</td>
+			</tr>
+			<tr>
+				<td>
+					Password:
+					<br>
+					<input id="pass" type="password" value="">
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<button id="push">Push</button>
+				</td>
+			</tr>
+		</table>
 		<div id="report">Waiting...</div>
 	</body>
 	<br>

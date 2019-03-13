@@ -39,7 +39,7 @@ function setter()
 	console.log("No error!");
 }
 
-function get(getter, key)
+function get(getter, key, check)
 {
 	getter(function(value)
 	{
@@ -49,7 +49,14 @@ function get(getter, key)
 			if (value[key])
 			{
 				var id = document.getElementById(key);
-				id.value = value[key];
+				if (check)
+				{
+					id.checked = value[key];
+				}
+				else
+				{
+					id.value = value[key];
+				}
 				return;
 			}
 			error("No "+key+" in value!");
@@ -91,6 +98,11 @@ function getCommit(getter)
 	browser.storage.local.get("commit").then(getter, error);
 }
 
+function getFormat(getter)
+{
+	browser.storage.local.get("format").then(getter, error);
+}
+
 function indent(level)
 {
 	return "&nbsp;*&nbsp;".repeat(level);
@@ -105,23 +117,32 @@ function solve(string)
 {
 	var solution;
 	solution = replace(string, "\"", "&quot;");
+	solution = replace(solution, "'", "&apos;");
 	solution = replace(solution, "&", "&amp;");
 	solution = replace(solution, "<", "&lt;");
 	solution = replace(solution, ">", "&gt;");
 	return solution;
 }
 
-async function process(current, level, output)
+async function process(current, level, output, format)
 {
 	var i;
 	var index;
 	var basis = level;
 	var content = "";
 	//console.log("Level: "+level);
-	content += ("\t".repeat(level))+"<bookmark";
+	if (format)
+	{
+		content += "\t".repeat(level);
+	}
+	content += "<bookmark ";
 	if (current.title)
 	{
-		content += "\n"+("\t".repeat(level))+"\tname=\""+solve(current.title)+"\"";
+		if (format)
+		{
+			content += "\n"+("\t".repeat(level))+"\t";
+		}
+		content += "name=\""+solve(current.title)+"\" ";
 		if (current.children)
 		{
 			level += 1;
@@ -132,7 +153,11 @@ async function process(current, level, output)
 			if (current.url)
 			{
 				index = await output(level, current.url, current.title, false);
-				content += "\n"+("\t".repeat(level))+"\turl=\""+solve(current.url)+"\"";
+				if (format)
+				{
+					content += "\n"+("\t".repeat(level))+"\t";
+				}
+				content += "url=\""+solve(current.url)+"\" ";
 			}
 			else
 			{
@@ -144,7 +169,11 @@ async function process(current, level, output)
 	{
 		if (current.url)
 		{
-			content += "\n"+("\t".repeat(level))+"\turl=\""+solve(current.url)+"\"";
+			if (format)
+			{
+				content += "\n"+("\t".repeat(level))+"\t";
+			}
+			content += "url=\""+solve(current.url)+"\" ";
 			if (current.children)
 			{
 				level += 1;
@@ -168,16 +197,26 @@ async function process(current, level, output)
 			}
 		}
 	}
-	content += "\n"+("\t".repeat(basis))+"\tindex=\""+index+"\">\n";
+	if (format)
+	{
+		content += "\n"+("\t".repeat(basis))+"\t";
+	}
+	content += "index=\""+index+"\">\n";
 	if (current.children)
 	{
 		var next;
+		level += 1;
 		for (next of current.children)
 		{
-			content += await process(next, level, output);
+			content += await process(next, level, output, format);
 		}
+		level -= 1;
 	}
-	content += ("\t".repeat(basis))+"</bookmark>\n";
+	if (format)
+	{
+		content += "\t".repeat(basis);
+	}
+	content += "</bookmark>\n";
 	level -= 1;
 	return content;
 }
@@ -214,11 +253,14 @@ async function handler(nodes)
 	var branch = document.getElementById("branch").value;
 	var author = document.getElementById("author").value;
 	var commit = document.getElementById("commit").value;
+	var format = document.getElementById("format").checked;
 	var user = document.getElementById("user").value;
 	var pass = document.getElementById("pass").value;
 	var contentHTML = "";
 	var contentXML = "";
 	var index = 0;
+	var head;
+	var tail;
 	var input = async function(level, target, name, directory)
 	{
 		var i;
@@ -228,11 +270,15 @@ async function handler(nodes)
 		//console.log("Index: "+index);
 		if (directory)
 		{
-			line = name+"<br>\n";
+			line = solve(name)+"<br>\n";
 		}
 		else
 		{
-			line = prepare(name, target);
+			line = prepare(solve(name), target);
+		}
+		if (format)
+		{
+			contentHTML += "\t\t";
 		}
 		contentHTML += indent(level)+line;
 		//console.log("File: "+full);
@@ -253,9 +299,8 @@ async function handler(nodes)
 		"depth": 1,
 		"corsProxy": proxy,
 	});
-	console.log("Here we go, I guess?");
-	contentXML += await process(nodes[0], 1, input, []);
-	console.log("Nodes have been processed...");
+	console.log("Process...");
+	contentXML += await process(nodes[0], 1, input, format);
 	/*
 	files = await git.listFiles(
 	{
@@ -264,8 +309,22 @@ async function handler(nodes)
 	*/
 	console.log(files);
 	console.log("Write...");
+	head = "<!doctype html>\n<html>\n\t<head>\n";
+	if (format)
+	{
+		head += "\t\t<title>git-bookmarks</title>\n\t</head>\n\t";
+	}
+	else
+	{
+		head += "<title>git-bookmarks</title></head>";
+	}
+	head += "<body>\n";
+	tail = "\t</body>\n</html>\n";
+	contentHTML = head+contentHTML+tail;
 	write(root+"index.html", contentHTML);
-	contentXML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<bookmarks>\n"+contentXML+"</bookmarks>\n";
+	head = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<bookmarks>\n";
+	tail = "</bookmarks>\n";
+	contentXML = head+contentXML+tail;
 	write(root+"index.xml", contentXML);
 	console.log("Add...");
 	await git.add({"dir": root, "filepath": "."});
@@ -325,6 +384,7 @@ function configure(target)
 	var branch = target.getElementById("branch").value;
 	var author = target.getElementById("author").value;
 	var commit = target.getElementById("commit").value;
+	var format = target.getElementById("format").checked;
 	var configuration = {};
 	configuration["path"] = path;
 	configuration["proxy"] = proxy;
@@ -332,6 +392,7 @@ function configure(target)
 	configuration["branch"] = branch;
 	configuration["author"] = author;
 	configuration["commit"] = commit;
+	configuration["format"] = format;
 	browser.storage.local.set(configuration).then(setter, error);
 }
 
@@ -343,12 +404,13 @@ function push()
 
 document.addEventListener("DOMContentLoaded", function()
 {
-	get(getPath, "path");
-	get(getProxy, "proxy");
-	get(getRepoURL, "repoURL");
-	get(getBranch, "branch");
-	get(getAuthor, "author");
-	get(getCommit, "commit");
+	get(getPath, "path", false);
+	get(getProxy, "proxy", false);
+	get(getRepoURL, "repoURL", false);
+	get(getBranch, "branch", false);
+	get(getAuthor, "author", false);
+	get(getCommit, "commit", false);
+	get(getFormat, "format", true);
     var configureButton = document.getElementById("configure");
     configureButton.addEventListener("click", function()
 	{
