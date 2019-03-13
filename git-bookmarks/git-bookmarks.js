@@ -96,25 +96,79 @@ function indent(level)
 	return "&nbsp;*&nbsp;".repeat(level);
 }
 
+function replace(string, search, replacement)
+{
+	return string.split(search).join(replacement);
+}
+
+function solve(string)
+{
+	var solution;
+	solution = replace(string, "\"", "&quot;");
+	solution = replace(solution, "&", "&amp;");
+	solution = replace(solution, "<", "&lt;");
+	solution = replace(solution, ">", "&gt;");
+	return solution;
+}
+
 async function process(current, level, output)
 {
 	var i;
 	var index;
+	var basis = level;
 	var content = "";
 	//console.log("Level: "+level);
-	content += ("\t".repeat(level))+"<bookmark\n";
-	content += ("\t".repeat(level))+"\tname=\""+current.title+"\"";
-	if (current.children)
+	content += ("\t".repeat(level))+"<bookmark";
+	if (current.title)
 	{
-		index = await output(level, current.title, current.title, false);
-		level += 1;
+		content += "\n"+("\t".repeat(level))+"\tname=\""+solve(current.title)+"\"";
+		if (current.children)
+		{
+			level += 1;
+			index = await output(level, current.title, current.title, true);
+		}
+		else
+		{
+			if (current.url)
+			{
+				index = await output(level, current.url, current.title, false);
+				content += "\n"+("\t".repeat(level))+"\turl=\""+solve(current.url)+"\"";
+			}
+			else
+			{
+				index = await output(level, current.title, current.title, false);
+			}
+		}
 	}
 	else
 	{
-		index = await output(level, current.url, current.title, true);
-		content += "\n"+("\t".repeat(level))+"\turl=\""+current.url+"\"";
+		if (current.url)
+		{
+			content += "\n"+("\t".repeat(level))+"\turl=\""+solve(current.url)+"\"";
+			if (current.children)
+			{
+				level += 1;
+				index = await output(level, current.url, current.url, true);
+			}
+			else
+			{
+				index = await output(level, current.url, current.url, false);
+			}
+		}
+		else
+		{
+			if (current.children)
+			{
+				level += 1;
+				index = await output(level, "", "", true);
+			}
+			else
+			{
+				index = await output(level, "", "", false);
+			}
+		}
 	}
-	content += ">\n";
+	content += "\n"+("\t".repeat(basis))+"\tindex=\""+index+"\">\n";
 	if (current.children)
 	{
 		var next;
@@ -123,8 +177,8 @@ async function process(current, level, output)
 			content += await process(next, level, output);
 		}
 	}
+	content += ("\t".repeat(basis))+"</bookmark>\n";
 	level -= 1;
-	content += ("\t".repeat(level))+"</bookmark>\n";;
 	return content;
 }
 
@@ -133,10 +187,10 @@ function prepare(name, target)
 	return "<a href=\""+target+"\">"+name+"</a><br>\n";
 }
 
-function report(total, free)
+function report(result)
 {
-	console.log("Total: "+total);
-	console.log("Free: "+free);
+	console.log(result);
+	document.getElementById("report").innerHTML = result;
 }
 
 async function write(path, content)
@@ -174,7 +228,7 @@ async function handler(nodes)
 		//console.log("Index: "+index);
 		if (directory)
 		{
-			line = name;
+			line = name+"<br>\n";
 		}
 		else
 		{
@@ -182,7 +236,7 @@ async function handler(nodes)
 		}
 		contentHTML += indent(level)+line;
 		//console.log("File: "+full);
-		console.log(line);
+		//console.log(line);
 		//write(full, line);
 		return index;
 	};
@@ -199,12 +253,8 @@ async function handler(nodes)
 		"depth": 1,
 		"corsProxy": proxy,
 	});
-	files = await git.listFiles(
-	{
-		"dir": root
-	});
 	console.log("Here we go, I guess?");
-	contentXML += await process(nodes[0], 0, input, []);
+	contentXML += await process(nodes[0], 1, input, []);
 	console.log("Nodes have been processed...");
 	/*
 	files = await git.listFiles(
@@ -215,7 +265,7 @@ async function handler(nodes)
 	console.log(files);
 	console.log("Write...");
 	write(root+"index.html", contentHTML);
-	contentXML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+contentXML;
+	contentXML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<bookmarks>\n"+contentXML+"</bookmarks>\n";
 	write(root+"index.xml", contentXML);
 	console.log("Add...");
 	await git.add({"dir": root, "filepath": "."});
@@ -243,6 +293,7 @@ async function handler(nodes)
 	{
 		if (result["ok"])
 		{
+			var ok;
 			for (ok of result["ok"])
 			{
 				console.log(ok);
@@ -250,6 +301,7 @@ async function handler(nodes)
 		}
 		if (result["errors"])
 		{
+			var errors;
 			for (errors of result["errors"])
 			{
 				error(errors);
@@ -262,7 +314,7 @@ async function handler(nodes)
 
 function handle(nodes)
 {
-	handler(nodes).then(console.log);
+	handler(nodes).then(report);
 }
 
 function configure(target)
@@ -305,6 +357,7 @@ document.addEventListener("DOMContentLoaded", function()
     var pushButton = document.getElementById("push");
     pushButton.addEventListener("click", function()
 	{
+		report("Waiting...");
         push();
     });
 });
